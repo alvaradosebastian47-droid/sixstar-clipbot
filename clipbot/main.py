@@ -86,9 +86,11 @@ def produce(cfg, cand, lang, wd, translated=False, dry=False):
     info = media.probe(src)
     src_lang = "en" if (translated or lang == "en") else "es"
     ss, to, transcript = media.speech_bounds(src, peak_t, lang=src_lang)
-    cam = media.find_facecam(src, info)
+    cam = media.find_facecam(src, info, ss, to)
     if not cam:
-        return None, {"score": 0, "reason": "no se detectó la cámara del streamer"}
+        return None, {"score": 0, "reason": "no se detectó la cámara del streamer (o el diseño cambia en el clip)"}
+    if media.game_is_dark(src, info, cam, ss, to):
+        return None, {"score": 0, "reason": "el juego está en negro (carga o pausa)"}
     shots = media.frames(src, [ss + 0.5, max(ss, peak_t - 2), peak_t, max(ss, to - 1)], os.path.join(wd, "fr"))
     if dry and not cfg["keys"].get("anthropic_api_key"):
         # prueba local sin clave: no se llama a la API, se usa un veredicto fijo para probar el render

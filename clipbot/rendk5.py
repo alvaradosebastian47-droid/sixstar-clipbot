@@ -130,7 +130,9 @@ if c.get("subs"):
             ev.append("Dialogue: 0,%s,%s,S,,0,0,0,,%s"%(at(_st),at(_en),txt))
         _i+=len(_g)
     ass="[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\n\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: S,Montserrat ExtraBold,66,&H00FFFFFF,&H00FFFFFF,&H00000000,&H64000000,0,0,0,0,100,100,0,0,1,6,2,2,60,60,300,1\n\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"+"\n".join(ev)+"\n"
-    open(o+"/subs.ass","w",encoding="utf-8").write(ass); SUBF=",ass='"+(o+"/subs.ass").replace("\\","/").replace(":","\\:")+"'"
+    open(o+"/subs.ass","w",encoding="utf-8").write(ass)
+    _esc=lambda q:q.replace("\\","/").replace(":","\\:")
+    SUBF=",ass='"+_esc(o+"/subs.ass")+"':fontsdir='"+_esc(A_+"/fonts")+"'"   # fuente del proyecto, no la del sistema
 BL=""
 for i,(bx,by,bw,bh,b0,b1) in enumerate(c.get("blurs",[])):
     b0=max(0,b0-ss); b1=b1-ss
