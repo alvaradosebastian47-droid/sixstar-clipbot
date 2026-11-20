@@ -1,0 +1,63 @@
+# SIX STAR ClipBot — configuración
+# Copia este archivo a config.yaml y llena las claves. config.yaml NUNCA se sube a GitHub.
+
+timezone: America/Costa_Rica
+quiet_hours: [23, 7]          # entre 23:00 y 07:00 no se publica (se puede producir para las 07:00)
+interval_minutes: 10          # cada cuánto corre el radar
+workdir: /opt/clipbot/work    # carpeta de trabajo (videos temporales)
+
+game: "Grand Theft Auto VI"
+
+radar:
+  max_clip_age_hours: 6       # prioridad a clips de menos de 6 h
+  hard_max_age_hours: 24
+  min_velocity: 400           # vistas por hora mínimas de un clip de Twitch para considerarlo
+  live_streams_per_lang: 3    # streams en vivo por idioma para picos de chat
+  chat_peak_min_x: 3.0        # pico de chat ≥ 3× la mediana
+  chat_window_min: 30         # minutos hacia atrás que se miran en cada corrida
+  max_reuploads_seen: 5       # (reservado) descartar si ya hay muchas resubidas
+
+live_capture:
+  enabled: true               # Streamlink: graba en vivo los N streams más grandes (buffer de 15 min)
+  streams: 4
+  buffer_minutes: 15
+
+judge:
+  model: claude-sonnet-5-5    # modelo de Anthropic para filtrar y titular
+  min_score: 6                # 0-10; debajo de esto no se publica
+
+accounts:
+  es:
+    accent: [61, 240, 110]
+    subs: false
+    youtube: true
+    tiktok: false             # true cuando Sebastian diga que TikTok va en automático
+    instagram: false
+    uploadpost_user: sixstar-es
+    hashtags: "#gta6 #gta6español #fyp #viral"
+    disclaimer: "Fan page. No afiliado con Rockstar Games."
+  en:
+    accent: [255, 79, 163]
+    subs: true
+    youtube: true
+    tiktok: false
+    instagram: false
+    uploadpost_user: sixstar-en
+    hashtags: "#gta6 #fyp #viral"
+    disclaimer: "Fan page. Not affiliated with Rockstar Games."
+
+limits:
+  per_run_per_lang: 1         # clips por idioma por corrida (2 si hay un momento muy fuerte)
+  youtube_per_day: 12         # tope diario por canal de YouTube
+  min_minutes_between_posts: 25
+
+blocklist_creators: []        # creadores con takedown
+
+keys:
+  anthropic_api_key: ""
+  uploadpost_api_key: ""
+  telegram_bot_token: ""
+  telegram_chat_id: ""
+  youtube:
+    es: {client_id: "", client_secret: "", refresh_token: ""}
+    en: {client_id: "", client_secret: "", refresh_token: ""}

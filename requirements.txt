@@ -1,0 +1,14 @@
+pyyaml
+numpy
+pillow
+requests
+yt-dlp
+streamlink
+faster-whisper
+av<16                # faster-whisper 1.2.x usa av.open(metadata_errors=...), que PyAV 16+ ya no acepta
+opencv-python-headless
+anthropic
+google-api-python-client
+google-auth
+google-auth-oauthlib
+tzdata

@@ -1,0 +1,14 @@
+[Unit]
+Description=SIX STAR ClipBot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/clipbot
+ExecStart=/opt/clipbot/.venv/bin/python -m clipbot.main --loop
+Environment=PATH=/opt/clipbot/.venv/bin:/usr/local/bin:/usr/bin:/bin
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
