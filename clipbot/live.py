@@ -4,6 +4,7 @@ Cada stream se graba en segmentos de 10 s nombrados con la hora UNIX de inicio
 (work/live/<login>/<epoch>.ts). Así un pico de chat (hora real) se corta del buffer
 en segundos, sin esperar a que Twitch procese el VOD.
 """
+import atexit
 import glob
 import os
 import signal
@@ -11,6 +12,16 @@ import subprocess
 import time
 
 PROCS = {}
+
+
+@atexit.register
+def stop_all():
+    """Al salir del bot (p. ej. --once) no deja grabaciones de streamlink huérfanas."""
+    for l in list(PROCS):
+        try:
+            stop(l)
+        except Exception:
+            pass
 
 
 def _dir(workdir, login):
