@@ -47,7 +47,7 @@ def category(game, n_streams=30, n_clips=50):
 def latest_vod(login):
     q = '{user(login:"%s"){stream{id createdAt} videos(first:1,sort:TIME){edges{node{id title lengthSeconds createdAt}}}}}' % login
     u = gql({"query": q})["data"]["user"]
-    if not u or not u["videos"]["edges"]:
+    if not u or not u.get("videos") or not u["videos"]["edges"]:  # canal sin VODs o con VODs ocultos
         return None
     v = u["videos"]["edges"][0]["node"]
     v["live"] = bool(u["stream"])
