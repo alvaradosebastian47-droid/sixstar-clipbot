@@ -23,7 +23,7 @@ Decide si el clip merece publicarse y escribe los textos. Reglas:
 - question_*: pregunta corta para el primer comentario que invite a responder.
 
 Responde SOLO con JSON:
-{{"score": 0-10, "reason": "...", "spoiler": true|false,
+{{"score": 0-10, "reason": "máximo 25 palabras", "spoiler": true|false,
  "title_es": "...", "title_en": "...", "question_es": "...", "question_en": "..."}}"""
 
 
@@ -36,11 +36,16 @@ def judge(cfg, frames, transcript, creator, platform, context):
                                                          "data": base64.b64encode(f.read()).decode()}})
     content.append({"type": "text", "text": PROMPT.format(creator=creator, platform=platform, context=context,
                                                           transcript=transcript[:1500], emojis=EMOJIS)})
-    msg = client.messages.create(model=cfg["judge"]["model"], max_tokens=600,
+    msg = client.messages.create(model=cfg["judge"]["model"], max_tokens=1500,
                                  messages=[{"role": "user", "content": content}])
     txt = "".join(b.text for b in msg.content if b.type == "text")
     m = re.search(r"\{.*\}", txt, re.S)
-    out = json.loads(m.group(0)) if m else {"score": 0, "reason": "sin JSON"}
+    try:
+        out = json.loads(m.group(0)) if m else None
+    except json.JSONDecodeError:
+        out = None
+    if out is None:
+        out = {"score": 0, "reason": f"sin JSON ({msg.stop_reason}): {txt[:200]}"}
     # limpia emojis que no tenemos en PNG
     allowed = set(EMOJIS.split())
     for k in ("title_es", "title_en"):
