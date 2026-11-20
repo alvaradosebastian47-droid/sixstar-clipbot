@@ -107,7 +107,7 @@ def produce(cfg, cand, lang, wd, translated=False, dry=False):
     rc = {"dir": wd, "src": src, "ss": ss, "to": to, "fps": info["fps"], "cam": cam, "game": game,
           "game_shift": shift, "name": cand["name"], "platform": "TWITCH", "user": cand["creator"],
           "accent": acc["accent"], "title": v["title_" + lang]}
-    if acc["subs"] or src_lang == "en" and lang == "en":
+    if acc["subs"]:  # solo si la cuenta los pide en config.yaml
         rc.update(subs=True, lang=src_lang)
     with open(os.path.join(wd, "cfg.json"), "w", encoding="utf-8") as f:
         json.dump(rc, f, ensure_ascii=False)

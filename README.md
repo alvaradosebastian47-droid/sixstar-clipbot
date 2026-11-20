@@ -20,7 +20,7 @@ Bot que corre 24/7 en un VPS y produce y publica clips de streamers de GTA 6 par
    - la pregunta del primer comentario.
 6. **Render v5** (`clipbot/rendk5.py`): el formato oficial de SIX STAR.
    - Cámara arriba, juego abajo, línea neón, título en cajas de color, marca discreta.
-   - Subtítulos EN.
+   - Sin subtítulos (se activan con `accounts.*.subs: true`).
    - Export 1080x1920 a 60 fps, crf 12.
 7. **Publicación**
    - YouTube con la API oficial: miniatura y primer comentario.

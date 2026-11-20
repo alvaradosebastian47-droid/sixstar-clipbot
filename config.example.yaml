@@ -38,7 +38,7 @@ accounts:
     disclaimer: "Fan page. No afiliado con Rockstar Games."
   en:
     accent: [255, 79, 163]
-    subs: true
+    subs: false               # subtítulos quemados en el video (true para activarlos)
     youtube: true
     tiktok: false
     instagram: false
