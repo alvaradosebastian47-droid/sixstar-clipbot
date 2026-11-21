@@ -138,7 +138,7 @@ for i,(bx,by,bw,bh,b0,b1) in enumerate(c.get("blurs",[])):
     b0=max(0,b0-ss); b1=b1-ss
     BL+=f"[s{i}]split[s{i}a][s{i}b];[s{i}b]crop={bw}:{bh}:{bx}:{by},boxblur=20:2[s{i}c];[s{i}a][s{i}c]overlay={bx}:{by}:enable='between(t,{b0},{b1})'[s{i+1}];"
 NB=len(c.get("blurs",[]))
-fc=(f"[0:v]{I}null[s0];{BL}[s{NB}]split=2[a][b];"
+fc=(f"[0:v]setpts=PTS-STARTPTS,{I}null[s0];{BL}[s{NB}]split=2[a][b];"
     f"[a]crop={cw}:{ch}:{cx}:{cy},scale=1080:{SEAM}:flags=lanczos,unsharp=5:5:0.5:5:5:0.0[cam];"
     f"[b]crop={gw}:{gh}:{gx}:{gy},scale=1080:{GH}:flags=lanczos,unsharp=5:5:0.5:5:5:0.0,eq=saturation=1.05:contrast=1.03[g];"
     f"color=black:s=1080x1920:r=60:d={dur}[bk];[bk][cam]overlay=0:0[v0];[v0][g]overlay=0:{SEAM}[v1];[v1][1:v]overlay=0:0{SUBF},format=yuv420p[vout];"
@@ -147,4 +147,18 @@ cmd=["ffmpeg","-v","error","-y","-ss",str(ss),"-t",str(dur),"-i",src,"-loop","1"
  "-c:v","libx264","-profile:v","high","-pix_fmt","yuv420p","-preset",c.get("preset","slow"),"-crf",str(c.get("crf",12)),"-maxrate","25M","-bufsize","50M",
  "-color_primaries","bt709","-color_trc","bt709","-colorspace","bt709","-c:a","aac","-b:a","320k","-ar","48000","-ac","2","-movflags","+faststart",o+"/clip_v5.mp4"]
 if "--ov" in sys.argv: print("ov",lines); sys.exit()
-subprocess.run(cmd,check=True); print("done",o,dur)
+def black_head(p):
+    """Segundos de negro al inicio (medido en una franja de la cámara, sin textos ni marca encima)."""
+    r=subprocess.run(["ffmpeg","-hide_banner","-t","2","-i",p,"-vf","crop=1080:240:0:20,blackdetect=d=0.01:pix_th=0.10","-an","-f","null","-"],capture_output=True,text=True).stderr
+    m=re.search(r"black_start:\s*([\d.]+)\s+black_end:\s*([\d.]+)",r)
+    return float(m.group(2)) if m and float(m.group(1))<0.05 else 0.0
+subprocess.run(cmd,check=True)
+# si el clip arranca en negro (el primer cuadro de imagen llega después que el audio), se recorta y se renderiza de nuevo
+bh=black_head(o+"/clip_v5.mp4")
+if 0<bh<1.5:
+    cut=round(bh+0.05,3); ss=round(ss+cut,3); dur=round(dur-cut,3)
+    cmd[cmd.index("-ss")+1]=str(ss)
+    for i,x in enumerate(cmd):
+        if x=="-t": cmd[i+1]=str(dur)
+    subprocess.run(cmd,check=True); print("negro al inicio recortado:",cut,"s")
+print("done",o,dur)
