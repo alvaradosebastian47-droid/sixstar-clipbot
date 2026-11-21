@@ -13,7 +13,7 @@ import time
 import traceback
 from datetime import datetime
 
-from . import config as C, db, twitch, live, media, judge as J, notify
+from . import config as C, db, twitch, live, media, judge as J, notify, report
 from .publish import youtube, uploadpost
 
 LANGS = ("es", "en")
@@ -141,8 +141,10 @@ def publish(cfg, lang, cand, res, dry):
                                      ["GTA 6", "GTA VI", cand["name"], "GTA 6 clips"], res["thumb"],
                                      v.get("question_" + lang), lang)
                 db.add_post(lang, "youtube", cand["creator"], title, url, cand["key"], day)
+                db.event(day, lang, "publicado")
                 links.append(url)
             except Exception as e:
+                db.event(day, lang, "fallo_publicacion")
                 links.append(f"YouTube falló: {e}")
     plats = [p for p in ("tiktok", "instagram") if acc.get(p)]
     if plats and not dry:
@@ -179,17 +181,23 @@ def run_once(cfg, dry=False):
                 break
             wd = os.path.join(cfg["workdir"], f"{t:%Y%m%d-%H%M}-{lang}-{cand['creator']}")
             log(lang, "probando", cand["kind"], cand["creator"], round(cand["score"]))
+            day = t.strftime("%Y-%m-%d")
+            if not dry:
+                db.event(day, lang, "probado")
             try:
                 res, v = produce(cfg, cand, lang, wd, translated, dry)
             except Exception:
                 log(traceback.format_exc()[-800:])
                 if not dry:
                     db.mark_used(cand["key"], lang, cand["creator"])
+                    db.event(day, lang, "error")
                 continue
             if not dry:  # una prueba no debe "gastar" momentos que luego se publicarían
                 db.mark_used(cand["key"], lang, cand["creator"])
             if not res:
                 log("descartado:", v.get("reason"))
+                if not dry:
+                    db.event(day, lang, "descartado")
                 continue
             links, caption = publish(cfg, lang, cand, res, dry)
             tag = "ES traducido" if translated else lang.upper()
@@ -221,6 +229,10 @@ def main():
     cfg = C.load()
     if a.loop:
         while True:
+            try:
+                report.maybe_send(cfg)  # reporte diario por Telegram (corre también en horario de silencio)
+            except Exception:
+                log("reporte:", traceback.format_exc()[-600:])
             try:
                 run_once(cfg, a.dry_run)
             except Exception:

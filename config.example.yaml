@@ -4,6 +4,7 @@
 timezone: America/Costa_Rica
 quiet_hours: [23, 7]          # entre 23:00 y 07:00 no se publica (se puede producir para las 07:00)
 interval_minutes: 10          # cada cuánto corre el radar
+report_hour: 22               # a esta hora llega el reporte diario por Telegram
 workdir: /opt/clipbot/work    # carpeta de trabajo (videos temporales)
 
 game: "Grand Theft Auto VI"
