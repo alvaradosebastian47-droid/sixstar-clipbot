@@ -63,7 +63,9 @@ def build(cfg):
         lines.append(f"👁 {_fmt(views)} vistas totales{d_views}")
         ev = db.events_count(day, lang)
         lines.append(f"🎬 Hoy: {ev.get('probado', 0)} momentos revisados · {ev.get('descartado', 0)} descartados · "
-                     f"{ev.get('publicado', 0)} publicados"
+                     f"{ev.get('publicado', 0)} en YouTube"
+                     + (f" · {ev.get('publicado_tiktok', 0)} en TikTok" if cfg["accounts"][lang].get("tiktok") else "")
+                     + (f" · {ev.get('publicado_instagram', 0)} en Instagram" if cfg["accounts"][lang].get("instagram") else "")
                      + (f" · ⚠️ {ev.get('fallo_publicacion', 0)} subidas fallidas" if ev.get("fallo_publicacion") else "")
                      + (f" · {ev.get('error', 0)} errores" if ev.get("error") else ""))
         rows = db.posts_since(lang, time.time() - 7 * 86400)

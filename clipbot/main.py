@@ -160,15 +160,24 @@ def publish(cfg, lang, cand, res, dry):
             except Exception as e:
                 db.event(day, lang, "fallo_publicacion")
                 links.append(f"YouTube falló: {e}")
-    plats = [p for p in ("tiktok", "instagram") if acc.get(p)]
-    if plats and not dry:
+    # TikTok permite 15 publicaciones al día por cuenta; se respeta un tope propio por debajo de eso
+    plats = [p for p in ("tiktok", "instagram") if acc.get(p)
+             and db.posts_today(lang, p, day) < L.get(p + "_per_day", 12)]
+    res["manual"] = not plats  # si no sale automático, el video llega por Telegram para subirlo a mano
+    if plats and dry:
+        links.append("+".join(plats) + "(dry)")
+    elif plats:
         try:
-            uploadpost.upload(keys["uploadpost_api_key"], acc["uploadpost_user"], res["video"], caption, plats)
-            for p in plats:
-                db.add_post(lang, p, cand["creator"], title, "upload-post", cand["key"], day)
-            links.append("+".join(plats) + " ✓")
+            urls = uploadpost.upload(keys["uploadpost_api_key"], acc["uploadpost_user"], res["video"], caption,
+                                     plats, v.get("question_" + lang))
+            for p, u in urls.items():
+                db.add_post(lang, p, cand["creator"], title, u, cand["key"], day)
+                db.event(day, lang, "publicado_" + p)
+                links.append(f"{p}: {u}" if u.startswith("http") else f"{p} ✓")
         except Exception as e:
+            db.event(day, lang, "fallo_publicacion")
             links.append(f"Upload-Post falló: {e}")
+            res["manual"] = True
     return links, caption
 
 
@@ -223,9 +232,8 @@ def run_once(cfg, dry=False):
             tag = "ES traducido" if translated else lang.upper()
             msg = (f"🎬 {tag} · {cand['name']}\n{res['verdict']['title_' + lang]}\n"
                    f"Fuente: {cand['context'][:160]}\n" + "\n".join(links) +
-                   ("\n\n📲 Para TikTok (copia el caption):\n" + caption
-                    if not cfg["accounts"][lang].get("tiktok") else ""))
-            notify.send(cfg, msg, res["video"] if not cfg["accounts"][lang].get("tiktok") else None)
+                   ("\n\n📲 Para TikTok (copia el caption):\n" + caption if res.get("manual") else ""))
+            notify.send(cfg, msg, res["video"] if res.get("manual") else None)
             made += 1
     # limpia carpetas de trabajo de más de 1 día
     for d in os.listdir(cfg["workdir"]):

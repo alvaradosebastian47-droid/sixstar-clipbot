@@ -50,6 +50,8 @@ accounts:
 limits:
   per_run_per_lang: 1         # clips por idioma por corrida (2 si hay un momento muy fuerte)
   youtube_per_day: 12         # tope diario por canal de YouTube
+  tiktok_per_day: 12          # tope diario por cuenta de TikTok (TikTok permite 15)
+  instagram_per_day: 12
   min_minutes_between_posts: 25
 
 # Streamers que el bot sigue. SOLO se usan estos (clips, picos de chat y grabación en vivo),
