@@ -14,7 +14,7 @@ class UploadPostError(RuntimeError):
     pass
 
 
-def upload(api_key, user, path, title, platforms, first_comment=None):
+def upload(api_key, user, path, title, platforms, first_comment=None, extra=None):
     """Sube el video a `platforms` (p. ej. ["tiktok"]) del perfil `user`.
 
     Devuelve {plataforma: url_o_"ok"}. Lanza UploadPostError si alguna plataforma falló.
@@ -22,6 +22,7 @@ def upload(api_key, user, path, title, platforms, first_comment=None):
     data = [("user", user), ("title", title)] + [("platform[]", p) for p in platforms]
     if first_comment:
         data.append(("first_comment", first_comment))
+    data += list((extra or {}).items())  # p. ej. {"privacy_level": "SELF_ONLY"} para pruebas
     # Idempotency-Key: si se corta la conexión y se reintenta, Upload-Post no publica dos veces
     headers = {"Authorization": "Apikey " + api_key, "Idempotency-Key": uuid.uuid4().hex}
     with open(path, "rb") as f:
