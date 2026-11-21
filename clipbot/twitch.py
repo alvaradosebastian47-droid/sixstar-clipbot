@@ -29,13 +29,14 @@ def gql(payload, retries=3):
             time.sleep(2)
 
 
-def category(game, n_streams=30, n_clips=50):
+def category(game, n_streams=100, n_clips=100):
     q = '{ game(name:"%s"){ streams(first:%d){edges{node{broadcaster{login displayName} viewersCount language title}}} ' \
         'clips(first:%d, criteria:{period:LAST_DAY, sort:VIEWS_DESC}){edges{node{slug title viewCount createdAt ' \
         'durationSeconds language broadcaster{login displayName}}}}}}' % (game, n_streams, n_clips)
-    g = gql({"query": q})["data"]["game"]
-    streams = [e["node"] for e in g["streams"]["edges"]]
-    clips = [e["node"] for e in g["clips"]["edges"]]
+    g = (gql({"query": q}).get("data") or {}).get("game") or {}
+    # Twitch a veces devuelve clips o streams en null: se sigue con lo que haya
+    streams = [e["node"] for e in ((g.get("streams") or {}).get("edges") or [])]
+    clips = [e["node"] for e in ((g.get("clips") or {}).get("edges") or [])]
     now = datetime.now(timezone.utc)
     for c in clips:
         age = (now - datetime.fromisoformat(c["createdAt"].replace("Z", "+00:00"))).total_seconds() / 3600

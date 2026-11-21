@@ -24,6 +24,19 @@ def log(*a):
 
 
 # ---------------------------------------------------------------- radar
+def roster(cfg):
+    """{login: idioma} de la lista `creators` de config.yaml; vacío = acepta a todos (idioma de Twitch)."""
+    return {c.lower(): l for l, cs in (cfg.get("creators") or {}).items() for c in (cs or [])}
+
+
+def lang_of(cfg, login, twitch_lang):
+    """Idioma del canal donde va este creador: el de la lista si hay lista (si no está, None = se ignora)."""
+    r = roster(cfg)
+    if r:
+        return r.get(login.lower())
+    return twitch_lang.lower()
+
+
 def candidates(cfg, streams, clips, lang):
     R = cfg["radar"]
     block = {b.lower() for b in cfg.get("blocklist_creators", [])}
@@ -31,18 +44,19 @@ def candidates(cfg, streams, clips, lang):
     out = []
     # A) clips en tendencia (ya probados por la audiencia)
     for c in clips:
-        if c["language"].lower() != lang or c["age_h"] > R["hard_max_age_hours"]:
+        if lang_of(cfg, c["broadcaster"]["login"], c["language"]) != lang or c["age_h"] > R["hard_max_age_hours"]:
             continue
         who = c["broadcaster"]["login"].lower()
         key = "clip:" + c["slug"]
-        if who in block or who == last or c["velocity"] < R["min_velocity"] or db.is_used(key, lang):
+        mv = R["min_velocity"][lang] if isinstance(R["min_velocity"], dict) else R["min_velocity"]
+        if who in block or who == last or c["velocity"] < mv or db.is_used(key, lang):
             continue
         boost = 1.0 if c["age_h"] <= R["max_clip_age_hours"] else 0.4
         out.append({"kind": "clip", "key": key, "creator": who, "name": c["broadcaster"]["displayName"],
                     "score": c["velocity"] * boost, "clip": c, "context": f"Clip de Twitch '{c['title']}' "
                     f"con {c['viewCount']} vistas en {c['age_h']} h"})
     # B) picos de chat en los streams más grandes de ese idioma
-    top = [s for s in streams if s["language"].lower() == lang][:R["live_streams_per_lang"]]
+    top = [s for s in streams if lang_of(cfg, s["broadcaster"]["login"], s["language"]) == lang][:R["live_streams_per_lang"]]
     for s in top:
         who = s["broadcaster"]["login"].lower()
         if who in block or who == last:
@@ -167,7 +181,13 @@ def run_once(cfg, dry=False):
     streams, clips = twitch.category(cfg["game"])
     log(f"{len(streams)} streams · {len(clips)} clips en la categoría")
     if cfg["live_capture"]["enabled"]:
-        top = [s["broadcaster"]["login"].lower() for s in streams[:cfg["live_capture"]["streams"]]]
+        # reparte la grabación entre idiomas (p. ej. 4 → 2 ES + 2 EN); si un idioma no tiene, el otro usa el cupo
+        n = cfg["live_capture"]["streams"]
+        by = {l: [s["broadcaster"]["login"].lower() for s in streams
+                  if lang_of(cfg, s["broadcaster"]["login"], s["language"]) == l] for l in LANGS}
+        top = [x for l in LANGS for x in by[l][:n // len(LANGS)]]
+        rest = [x for l in LANGS for x in by[l] if x not in top]
+        top += rest[:n - len(top)]
         live.sync(cfg["workdir"], top, cfg["live_capture"]["buffer_minutes"])
     for lang in LANGS:
         cands = candidates(cfg, streams, clips, lang)

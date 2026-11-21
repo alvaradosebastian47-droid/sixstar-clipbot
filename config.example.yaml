@@ -12,7 +12,7 @@ game: "Grand Theft Auto VI"
 radar:
   max_clip_age_hours: 6       # prioridad a clips de menos de 6 h
   hard_max_age_hours: 24
-  min_velocity: 400           # vistas por hora mínimas de un clip de Twitch para considerarlo
+  min_velocity: {es: 120, en: 400}   # vistas por hora mínimas de un clip de Twitch, por idioma
   live_streams_per_lang: 3    # streams en vivo por idioma para picos de chat
   chat_peak_min_x: 3.0        # pico de chat ≥ 3× la mediana
   chat_window_min: 30         # minutos hacia atrás que se miran en cada corrida
@@ -51,6 +51,17 @@ limits:
   per_run_per_lang: 1         # clips por idioma por corrida (2 si hay un momento muy fuerte)
   youtube_per_day: 12         # tope diario por canal de YouTube
   min_minutes_between_posts: 25
+
+# Streamers que el bot sigue. SOLO se usan estos (clips, picos de chat y grabación en vivo),
+# y cada uno va al canal de su lista sin importar la etiqueta de idioma de Twitch.
+# Agrega o quita nombres de usuario de Twitch (en minúscula). Lista vacía = cualquiera.
+creators:
+  es: [ibai, auronplay, rubius, thegrefg, juansguarnizo, elmariana, elspreen, arigameplays, rivers_gg,
+       quackity, robleis, carreraaa, illojuan, elxokas, coscu, staryuuki, vegetta777, alexby11, aroyitt,
+       willyrex, mangel, knekro, momoladinastia]
+  en: [kaicenat, ishowspeed, caseoh_, xqc, jynxzi, stableronaldo, fanum, lacy, agent00, plaqueboymax,
+       jasontheween, zackrawrr, moistcr1tikal, hasanabi, theburntpeanut, joe_bartolozzi, summit1g, tarik,
+       emiru, nmplol]
 
 blocklist_creators: []        # creadores con takedown
 
