@@ -65,6 +65,11 @@ creators:
        jasontheween, zackrawrr, moistcr1tikal, hasanabi, theburntpeanut, joe_bartolozzi, summit1g, tarik,
        emiru, nmplol]
 
+# Streamers de KICK (nombre del canal en kick.com, en minúscula). Mismas reglas que `creators`.
+creators_kick:
+  es: [westcol, davooxeneize, lacobraaa, elzeein, spreen, coscu, brunenger, zeko]
+  en: [adinross, xqc, n3on, trainwreckstv, iceposeidon, cuffem]
+
 blocklist_creators: []        # creadores con takedown
 
 keys:

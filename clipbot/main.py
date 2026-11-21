@@ -13,7 +13,7 @@ import time
 import traceback
 from datetime import datetime
 
-from . import config as C, db, twitch, live, media, judge as J, notify, report
+from . import config as C, db, twitch, kick, live, media, judge as J, notify, report
 from .publish import youtube, uploadpost
 
 LANGS = ("es", "en")
@@ -24,17 +24,26 @@ def log(*a):
 
 
 # ---------------------------------------------------------------- radar
-def roster(cfg):
-    """{login: idioma} de la lista `creators` de config.yaml; vacío = acepta a todos (idioma de Twitch)."""
-    return {c.lower(): l for l, cs in (cfg.get("creators") or {}).items() for c in (cs or [])}
+PLAT = {"twitch": ("Twitch", "TWITCH", "twitch.tv/"), "kick": ("Kick", "KICK", "kick.com/")}
 
 
-def lang_of(cfg, login, twitch_lang):
+def roster(cfg, platform="twitch"):
+    """{login: idioma} de la lista de config.yaml (`creators` = Twitch, `creators_kick` = Kick)."""
+    key = "creators_kick" if platform == "kick" else "creators"
+    return {c.lower(): l for l, cs in (cfg.get(key) or {}).items() for c in (cs or [])}
+
+
+def lang_of(cfg, login, twitch_lang, platform="twitch"):
     """Idioma del canal donde va este creador: el de la lista si hay lista (si no está, None = se ignora)."""
-    r = roster(cfg)
-    if r:
+    r = roster(cfg, platform)
+    if r or platform == "kick":
         return r.get(login.lower())
     return twitch_lang.lower()
+
+
+def rec_key(s):
+    """Nombre de la grabación en vivo (el mismo streamer puede estar en Twitch y en Kick)."""
+    return ("kick-" if s.get("platform") == "kick" else "") + s["broadcaster"]["login"].lower()
 
 
 def candidates(cfg, streams, clips, lang):
@@ -44,7 +53,8 @@ def candidates(cfg, streams, clips, lang):
     out = []
     # A) clips en tendencia (ya probados por la audiencia)
     for c in clips:
-        if lang_of(cfg, c["broadcaster"]["login"], c["language"]) != lang or c["age_h"] > R["hard_max_age_hours"]:
+        plat = c.get("platform", "twitch")
+        if lang_of(cfg, c["broadcaster"]["login"], c["language"], plat) != lang or c["age_h"] > R["hard_max_age_hours"]:
             continue
         who = c["broadcaster"]["login"].lower()
         key = "clip:" + c["slug"]
@@ -53,16 +63,20 @@ def candidates(cfg, streams, clips, lang):
             continue
         boost = 1.0 if c["age_h"] <= R["max_clip_age_hours"] else 0.4
         out.append({"kind": "clip", "key": key, "creator": who, "name": c["broadcaster"]["displayName"],
-                    "score": c["velocity"] * boost, "clip": c, "context": f"Clip de Twitch '{c['title']}' "
+                    "platform": plat, "score": c["velocity"] * boost, "clip": c,
+                    "context": f"Clip de {PLAT[plat][0]} '{c['title']}' "
                     f"con {c['viewCount']} vistas en {c['age_h']} h"})
     # B) picos de chat en los streams más grandes de ese idioma
-    top = [s for s in streams if lang_of(cfg, s["broadcaster"]["login"], s["language"]) == lang][:R["live_streams_per_lang"]]
+    top = [s for s in streams if lang_of(cfg, s["broadcaster"]["login"], s["language"],
+                                         s.get("platform", "twitch")) == lang][:R["live_streams_per_lang"]]
     for s in top:
         who = s["broadcaster"]["login"].lower()
+        plat = s.get("platform", "twitch")
         if who in block or who == last:
             continue
         try:
-            vod, peaks = twitch.chat_peaks(who, R["chat_window_min"], 15, R["chat_peak_min_x"])
+            src = kick if plat == "kick" else twitch
+            vod, peaks = src.chat_peaks(who, R["chat_window_min"], 15, R["chat_peak_min_x"])
         except Exception as e:
             log("chat_peaks", who, e)
             continue
@@ -71,7 +85,8 @@ def candidates(cfg, streams, clips, lang):
             if db.is_used(key, lang):
                 continue
             out.append({"kind": "peak", "key": key, "creator": who, "name": s["broadcaster"]["displayName"],
-                        "score": p["x"] * 800, "peak": p, "stream_title": s["title"],
+                        "platform": plat, "rec": rec_key(s), "score": p["x"] * 800, "peak": p,
+                        "stream_title": s["title"],
                         "context": f"Pico de chat x{p['x']} hace {p['min_ago']} min en el stream "
                         f"'{s['title']}'. Chat: {' | '.join(p['msgs'][:6])}"})
     out.sort(key=lambda x: -x["score"])
@@ -82,15 +97,21 @@ def candidates(cfg, streams, clips, lang):
 def fetch_source(cfg, cand, wd):
     src = os.path.join(wd, "src.mp4")
     if cand["kind"] == "clip":
-        twitch.download_clip(cand["clip"]["slug"], src)
+        if cand["platform"] == "kick":
+            kick.download_clip(cand["clip"]["clip_url"], src)
+        else:
+            twitch.download_clip(cand["clip"]["slug"], src)
         return src, media.loudest_moment(src)
     p = cand["peak"]
     a, b = max(0, p["t"] - 28), p["t"] + 10
     if cfg["live_capture"]["enabled"] and p["live"]:
         t0 = datetime.fromisoformat(p["vod_created"].replace("Z", "+00:00")).timestamp()
-        if live.cut(cfg["workdir"], cand["creator"], t0 + a, t0 + b, src):
+        if live.cut(cfg["workdir"], cand.get("rec", cand["creator"]), t0 + a, t0 + b, src):
             return src, p["t"] - a
-    twitch.vodcut(p["vod"], a, b, src)
+    if cand["platform"] == "kick":
+        kick.vodcut(p["source"], a, b, src)
+    else:
+        twitch.vodcut(p["vod"], a, b, src)
     return src, p["t"] - a
 
 
@@ -113,13 +134,13 @@ def produce(cfg, cand, lang, wd, translated=False, dry=False):
              "title_es": f"prueba de {cand['name']} en gta 6 🔥", "title_en": f"{cand['name']} gta 6 test clip 🔥",
              "question_es": "¿qué opinas?", "question_en": "thoughts?"}
     else:
-        v = J.judge(cfg, shots, transcript, cand["name"], "Twitch", cand["context"])
+        v = J.judge(cfg, shots, transcript, cand["name"], PLAT[cand["platform"]][0], cand["context"])
     if v.get("score", 0) < cfg["judge"]["min_score"]:
         return None, v
     acc = cfg["accounts"][lang]
     game, shift = media.game_box(info, cam)
     rc = {"dir": wd, "src": src, "ss": ss, "to": to, "fps": info["fps"], "cam": cam, "game": game,
-          "game_shift": shift, "name": cand["name"], "platform": "TWITCH", "user": cand["creator"],
+          "game_shift": shift, "name": cand["name"], "platform": PLAT[cand["platform"]][1], "user": cand["creator"],
           "accent": acc["accent"], "title": v["title_" + lang]}
     if acc["subs"]:  # solo si la cuenta los pide en config.yaml
         rc.update(subs=True, lang=src_lang)
@@ -139,10 +160,10 @@ def publish(cfg, lang, cand, res, dry):
     title = v["title_" + lang]
     day = C.now(cfg).strftime("%Y-%m-%d")
     spoiler = "⚠️ Spoilers\n" if v.get("spoiler") else ""
-    credit = f"Clip: {cand['name']} en twitch.tv/{cand['creator']}" if lang == "es" else \
-        f"Clip: {cand['name']} on twitch.tv/{cand['creator']}"
+    url = PLAT[cand["platform"]][2] + cand["creator"]
+    credit = f"Clip: {cand['name']} en {url}" if lang == "es" else f"Clip: {cand['name']} on {url}"
     desc = f"{title}\n\n{spoiler}{credit}\n{acc['disclaimer']}\n\n#{cand['creator']} {acc['hashtags']}"
-    caption = f"{title}\n{spoiler}Clip: twitch.tv/{cand['creator']}\n#{cand['creator']} {acc['hashtags']}"
+    caption = f"{title}\n{spoiler}Clip: {url}\n#{cand['creator']} {acc['hashtags']}"
     links = []
     L = cfg["limits"]
     if acc["youtube"] and db.posts_today(lang, "youtube", day) < L["youtube_per_day"] \
@@ -188,12 +209,24 @@ def run_once(cfg, dry=False):
         log("horario de silencio")
         return
     streams, clips = twitch.category(cfg["game"])
-    log(f"{len(streams)} streams · {len(clips)} clips en la categoría")
+    for s in streams + clips:
+        s.setdefault("platform", "twitch")
+    log(f"Twitch: {len(streams)} streams · {len(clips)} clips en la categoría")
+    ks = list(roster(cfg, "kick"))
+    if ks:
+        try:
+            kstreams, kclips = kick.live_gta(ks), kick.clips(ks)
+            log(f"Kick: {len(kstreams)} de la lista en vivo en GTA 6 · {len(kclips)} clips")
+            streams = sorted(streams + kstreams, key=lambda s: -s["viewersCount"])
+            clips += kclips
+        except Exception as e:
+            log("Kick falló:", e)
     if cfg["live_capture"]["enabled"]:
         # reparte la grabación entre idiomas (p. ej. 4 → 2 ES + 2 EN); si un idioma no tiene, el otro usa el cupo
         n = cfg["live_capture"]["streams"]
-        by = {l: [s["broadcaster"]["login"].lower() for s in streams
-                  if lang_of(cfg, s["broadcaster"]["login"], s["language"]) == l] for l in LANGS}
+        by = {l: [rec_key(s) for s in streams
+                  if lang_of(cfg, s["broadcaster"]["login"], s["language"], s.get("platform", "twitch")) == l]
+              for l in LANGS}
         top = [x for l in LANGS for x in by[l][:n // len(LANGS)]]
         rest = [x for l in LANGS for x in by[l] if x not in top]
         top += rest[:n - len(top)]

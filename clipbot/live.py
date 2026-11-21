@@ -35,7 +35,8 @@ def start(workdir, login):
     if p and p.poll() is None:
         return
     d = _dir(workdir, login)
-    cmd = (f"streamlink --twitch-disable-ads --stdout https://twitch.tv/{login} 1080p60,1080p,best "
+    url = f"https://kick.com/{login[5:]}" if login.startswith("kick-") else f"https://twitch.tv/{login}"
+    cmd = (f"streamlink --twitch-disable-ads --stdout {url} 1080p60,1080p,best "
            f"| ffmpeg -v error -i - -c copy -f segment -segment_time 10 -reset_timestamps 1 "
            f"-strftime 1 '{d}/%s.ts'")
     PROCS[login] = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid,
